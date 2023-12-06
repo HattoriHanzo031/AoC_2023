@@ -4,19 +4,10 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"utils"
 )
-
-func toInts(ss []string) []int {
-	ints := make([]int, 0, len(ss))
-	for _, s := range ss {
-		ints = append(ints, utils.Must(strconv.Atoi(s)))
-	}
-	return ints
-}
 
 type mapping func(in int) (int, bool)
 
@@ -53,7 +44,7 @@ func main() {
 	scanner, cleanup := utils.FileScaner("d5/input.txt")
 	defer cleanup()
 	scanner.Scan()
-	seeds := toInts(strings.Fields(strings.Split(scanner.Text(), ":")[1]))
+	seeds := utils.ToInts(strings.Fields(strings.Split(scanner.Text(), ":")[1]))
 
 	scanner.Scan() // skip empty line
 	scanner.Scan() // skip title
@@ -67,7 +58,7 @@ func main() {
 			scanner.Scan() // skip title
 			continue
 		}
-		m := toInts(strings.Fields(scanner.Text()))
+		m := utils.ToInts(strings.Fields(scanner.Text()))
 		mappings = append(mappings, mappingFn(m[1], m[1]+m[2]-1, m[0]-m[1]))
 	}
 
