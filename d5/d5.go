@@ -5,7 +5,6 @@ import (
 	"math"
 	"slices"
 	"strings"
-	"sync"
 	"utils"
 )
 
@@ -71,29 +70,102 @@ func main() {
 	}
 	fmt.Println(closest)
 
-	var wg sync.WaitGroup
-	ch := make(chan int, 10)
-	for i := 0; i < len(seeds); i += 2 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			closest = math.MaxInt
-			for count := 0; count < seeds[i+1]; count++ {
-				location, _ := pipeline(seeds[i] + count)
-				closest = min(closest, location)
+	partTwo()
+}
+
+// PART TWO
+type singleRange struct {
+	start, end int
+}
+
+func (sr singleRange) isIn(a int) bool {
+	return a >= sr.start && a <= sr.end
+}
+
+type mappingRanges func(in singleRange) (mapped []singleRange, unmapped []singleRange)
+
+func mappingRangesFn(from, to, offset int) mappingRanges {
+	return func(inR singleRange) (mapped []singleRange, unmapped []singleRange) {
+		if from <= inR.start && to >= inR.end {
+			return []singleRange{{inR.start + offset, inR.end + offset}}, nil
+		}
+
+		if !inR.isIn(from) && !inR.isIn(to) {
+			return nil, []singleRange{inR}
+		}
+
+		if inR.isIn(from - 1) {
+			unmapped = append(unmapped, singleRange{inR.start, from - 1})
+			inR.start = from
+		}
+		if inR.isIn(to + 1) {
+			unmapped = append(unmapped, singleRange{to + 1, inR.end})
+			inR.end = to
+		}
+		if inR.start <= inR.end {
+			mapped = append(mapped, singleRange{inR.start + offset, inR.end + offset})
+		}
+		return mapped, unmapped
+	}
+}
+
+type stageRanges func(inRs []singleRange) (mapped []singleRange, unmapped []singleRange)
+
+func stageRangesFn(mappers []mappingRanges) stageRanges {
+	return func(inRs []singleRange) (outMapped []singleRange, outUm []singleRange) {
+		for _, inR := range inRs {
+			unmapped := []singleRange{inR}
+			for _, mapper := range mappers {
+				accUm := []singleRange{}
+				for _, in := range unmapped {
+					mm, um := mapper(in)
+					outMapped = append(outMapped, mm...)
+					accUm = append(accUm, um...)
+				}
+				unmapped = accUm
 			}
-			ch <- closest
-		}(i)
+			outUm = append(outUm, unmapped...)
+		}
+		return outMapped, outUm
+	}
+}
+
+func partTwo() {
+	scanner, cleanup := utils.FileScaner("d5/input.txt")
+	defer cleanup()
+	scanner.Scan()
+	seeds := utils.ToInts(strings.Fields(strings.Split(scanner.Text(), ":")[1]))
+
+	scanner.Scan() // skip empty line
+	scanner.Scan() // skip title
+
+	stage := []mappingRanges{}
+	pipeline := []stageRanges{}
+	for scanner.Scan() {
+		if len(scanner.Text()) == 0 {
+			pipeline = append(pipeline, stageRangesFn(slices.Clone(stage)))
+			stage = stage[:0]
+			scanner.Scan() // skip title
+			continue
+		}
+		m := utils.ToInts(strings.Fields(scanner.Text()))
+		stage = append(stage, mappingRangesFn(m[1], m[1]+m[2]-1, m[0]-m[1]))
 	}
 
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
-
-	closest = math.MaxInt
-	for location := range ch {
-		closest = min(closest, location)
+	inRanges := []singleRange{}
+	for i := 0; i < len(seeds); i += 2 {
+		inRanges = append(inRanges, singleRange{seeds[i], seeds[i] + seeds[i+1] - 1})
 	}
-	fmt.Println(closest)
+	stageRanges := slices.Clone(inRanges)
+	for _, stage := range pipeline {
+		mm, um := stage(stageRanges)
+		stageRanges = slices.Clone(mm)
+		stageRanges = append(stageRanges, um...)
+	}
+
+	slices.SortFunc(stageRanges, func(a, b singleRange) int {
+		return a.start - b.start
+	})
+
+	fmt.Println("closest:", stageRanges[0].start)
 }
