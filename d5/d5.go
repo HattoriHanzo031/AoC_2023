@@ -109,24 +109,24 @@ func mappingRangesFn(from, to, offset int) mappingRanges {
 	}
 }
 
-type stageRanges func(inRs []singleRange) (mapped []singleRange, unmapped []singleRange)
+type stageRanges func(inRs []singleRange) (out []singleRange)
 
 func stageRangesFn(mappers []mappingRanges) stageRanges {
-	return func(inRs []singleRange) (outMapped []singleRange, outUm []singleRange) {
+	return func(inRs []singleRange) (out []singleRange) {
 		for _, inR := range inRs {
 			unmapped := []singleRange{inR}
 			for _, mapper := range mappers {
 				accUm := []singleRange{}
 				for _, in := range unmapped {
 					mm, um := mapper(in)
-					outMapped = append(outMapped, mm...)
+					out = append(out, mm...)
 					accUm = append(accUm, um...)
 				}
 				unmapped = accUm
 			}
-			outUm = append(outUm, unmapped...)
+			out = append(out, unmapped...)
 		}
-		return outMapped, outUm
+		return out
 	}
 }
 
@@ -152,20 +152,18 @@ func partTwo() {
 		stage = append(stage, mappingRangesFn(m[1], m[1]+m[2]-1, m[0]-m[1]))
 	}
 
-	inRanges := []singleRange{}
+	ranges := []singleRange{}
 	for i := 0; i < len(seeds); i += 2 {
-		inRanges = append(inRanges, singleRange{seeds[i], seeds[i] + seeds[i+1] - 1})
-	}
-	stageRanges := slices.Clone(inRanges)
-	for _, stage := range pipeline {
-		mm, um := stage(stageRanges)
-		stageRanges = slices.Clone(mm)
-		stageRanges = append(stageRanges, um...)
+		ranges = append(ranges, singleRange{seeds[i], seeds[i] + seeds[i+1] - 1})
 	}
 
-	slices.SortFunc(stageRanges, func(a, b singleRange) int {
+	for _, stage := range pipeline {
+		ranges = stage(ranges)
+	}
+
+	slices.SortFunc(ranges, func(a, b singleRange) int {
 		return a.start - b.start
 	})
 
-	fmt.Println("closest:", stageRanges[0].start)
+	fmt.Println("closest:", ranges[0].start)
 }
