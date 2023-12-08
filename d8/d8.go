@@ -47,7 +47,7 @@ func main() {
 	for turn = 0; len(periods) < len(lanes); turn++ {
 		for i := 0; i < len(lanes); i++ {
 			lanes[i] = nodes[lanes[i]][instructions[turn%len(instructions)]]
-			if endingPoints[lanes[i]] {
+			if endingPoints[lanes[i]] && (turn+1)%len(instructions) == 0 {
 				periods = append(periods, turn+1)
 			}
 		}
