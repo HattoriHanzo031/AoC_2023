@@ -74,49 +74,49 @@ func main() {
 }
 
 // PART TWO
-type singleRange struct {
+type Range struct {
 	start, end int
 }
 
-func (sr singleRange) isIn(a int) bool {
+func (sr Range) isIn(a int) bool {
 	return a >= sr.start && a <= sr.end
 }
 
-type mappingRanges func(in singleRange) (mapped []singleRange, unmapped []singleRange)
+type rangeMapping func(in Range) (mapped []Range, unmapped []Range)
 
-func mappingRangesFn(from, to, offset int) mappingRanges {
-	return func(inR singleRange) (mapped []singleRange, unmapped []singleRange) {
+func rangeMappingFn(from, to, offset int) rangeMapping {
+	return func(inR Range) (mapped []Range, unmapped []Range) {
 		if from <= inR.start && to >= inR.end {
-			return []singleRange{{inR.start + offset, inR.end + offset}}, nil
+			return []Range{{inR.start + offset, inR.end + offset}}, nil
 		}
 
 		if !inR.isIn(from) && !inR.isIn(to) {
-			return nil, []singleRange{inR}
+			return nil, []Range{inR}
 		}
 
 		if inR.isIn(from - 1) {
-			unmapped = append(unmapped, singleRange{inR.start, from - 1})
+			unmapped = append(unmapped, Range{inR.start, from - 1})
 			inR.start = from
 		}
 		if inR.isIn(to + 1) {
-			unmapped = append(unmapped, singleRange{to + 1, inR.end})
+			unmapped = append(unmapped, Range{to + 1, inR.end})
 			inR.end = to
 		}
 		if inR.start <= inR.end {
-			mapped = append(mapped, singleRange{inR.start + offset, inR.end + offset})
+			mapped = append(mapped, Range{inR.start + offset, inR.end + offset})
 		}
 		return mapped, unmapped
 	}
 }
 
-type stageRanges func(inRs []singleRange) (out []singleRange)
+type stageMapping func(inRs []Range) (out []Range)
 
-func stageRangesFn(mappers []mappingRanges) stageRanges {
-	return func(inRs []singleRange) (out []singleRange) {
+func stageMappingFn(mappers []rangeMapping) stageMapping {
+	return func(inRs []Range) (out []Range) {
 		for _, inR := range inRs {
-			unmapped := []singleRange{inR}
+			unmapped := []Range{inR}
 			for _, mapper := range mappers {
-				accUm := []singleRange{}
+				accUm := []Range{}
 				for _, in := range unmapped {
 					mm, um := mapper(in)
 					out = append(out, mm...)
@@ -139,29 +139,29 @@ func partTwo() {
 	scanner.Scan() // skip empty line
 	scanner.Scan() // skip title
 
-	stage := []mappingRanges{}
-	pipeline := []stageRanges{}
+	stage := []rangeMapping{}
+	pipeline := []stageMapping{}
 	for scanner.Scan() {
 		if len(scanner.Text()) == 0 {
-			pipeline = append(pipeline, stageRangesFn(slices.Clone(stage)))
+			pipeline = append(pipeline, stageMappingFn(slices.Clone(stage)))
 			stage = stage[:0]
 			scanner.Scan() // skip title
 			continue
 		}
 		m := utils.ToInts(strings.Fields(scanner.Text()))
-		stage = append(stage, mappingRangesFn(m[1], m[1]+m[2]-1, m[0]-m[1]))
+		stage = append(stage, rangeMappingFn(m[1], m[1]+m[2]-1, m[0]-m[1]))
 	}
 
-	ranges := []singleRange{}
+	ranges := []Range{}
 	for i := 0; i < len(seeds); i += 2 {
-		ranges = append(ranges, singleRange{seeds[i], seeds[i] + seeds[i+1] - 1})
+		ranges = append(ranges, Range{seeds[i], seeds[i] + seeds[i+1] - 1})
 	}
 
 	for _, stage := range pipeline {
 		ranges = stage(ranges)
 	}
 
-	slices.SortFunc(ranges, func(a, b singleRange) int {
+	slices.SortFunc(ranges, func(a, b Range) int {
 		return a.start - b.start
 	})
 
