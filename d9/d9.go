@@ -34,10 +34,10 @@ func main() {
 		fn := alternateAddSubFn()
 		totalP1 += history[len(history)-1]
 		totalP2 = fn(totalP2, history[0])
-		for sum := -1; sum != 0; {
-			sum = 0
+		for allZeroes := false; !allZeroes; {
+			allZeroes = true
 			for i := 0; i < len(history)-1; i++ {
-				sum += history[i]
+				allZeroes = allZeroes && history[i] == 0
 				history[i] = history[i+1] - history[i]
 			}
 			history = history[:len(history)-1]
