@@ -20,16 +20,16 @@ func main() {
 	scanner, cleanup := utils.FileScaner("d11/input.txt")
 	defer cleanup()
 
-	emptyRows := map[int]int{}
+	expandedRows := map[int]int{}
 	universe := [][]byte{}
 	for row := 0; scanner.Scan(); row++ {
 		universe = append(universe, slices.Clone(scanner.Bytes()))
 		if bytes.Count(scanner.Bytes(), []byte{'#'}) == 0 {
-			emptyRows[row] = 1
+			expandedRows[row] = 1
 		}
 	}
 
-	emptyColumns := map[int]int{}
+	expandedColumns := map[int]int{}
 	for col := 0; col < len(universe[0]); col++ {
 		count := 0
 		for row := 0; row < len(universe); row++ {
@@ -38,10 +38,11 @@ func main() {
 			}
 		}
 		if count == 0 {
-			emptyColumns[col] = 1
+			expandedColumns[col] = 1
 		}
 	}
 
+	expansionRate := 1000_000 - 1
 	galaxies := map[coord]bool{}
 	yExpanded := 0
 	for y, row := range universe {
@@ -50,12 +51,10 @@ func main() {
 			if c == '#' {
 				galaxies[coord{xExpanded, yExpanded}] = true
 			}
-			xExpanded += emptyColumns[x] + 1
+			xExpanded += expandedColumns[x]*expansionRate + 1
 		}
-		yExpanded += emptyRows[y] + 1
+		yExpanded += expandedRows[y]*expansionRate + 1
 	}
-
-	fmt.Println(galaxies)
 
 	total := 0
 	for galaxy1 := range galaxies {
