@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"golang.org/x/exp/constraints"
 )
 
 func Must[T any](v T, err error) T {
@@ -55,4 +57,11 @@ func LCM(a, b int, integers ...int) int {
 
 func Profile(start time.Time) {
 	fmt.Println(time.Since(start))
+}
+
+func Abs[T constraints.Signed](x T) T {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
