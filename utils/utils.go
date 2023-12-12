@@ -34,10 +34,10 @@ func ToInts[T ~string | ~[]byte](ss []T) []int {
 	return ints
 }
 
-func ToUints[T ~string | ~[]byte](ss []T) []uint {
-	ints := make([]uint, 0, len(ss))
+func ToIntegers[T ~string | ~[]byte, K constraints.Integer](ss []T) []K {
+	ints := make([]K, 0, len(ss))
 	for _, s := range ss {
-		ints = append(ints, uint(Must(strconv.Atoi(string(s)))))
+		ints = append(ints, K(Must(strconv.Atoi(string(s)))))
 	}
 	return ints
 }
@@ -72,4 +72,12 @@ func Abs[T constraints.Signed](x T) T {
 		return -x
 	}
 	return x
+}
+
+func Sum[T constraints.Integer | constraints.Float](ss []T) T {
+	var sum T
+	for _, s := range ss {
+		sum += s
+	}
+	return sum
 }
