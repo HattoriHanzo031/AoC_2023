@@ -26,10 +26,18 @@ func FileScaner(path string) (*bufio.Scanner, func()) {
 	}
 }
 
-func ToInts(ss []string) []int {
+func ToInts[T ~string | ~[]byte](ss []T) []int {
 	ints := make([]int, 0, len(ss))
 	for _, s := range ss {
-		ints = append(ints, Must(strconv.Atoi(s)))
+		ints = append(ints, Must(strconv.Atoi(string(s))))
+	}
+	return ints
+}
+
+func ToUints[T ~string | ~[]byte](ss []T) []uint {
+	ints := make([]uint, 0, len(ss))
+	for _, s := range ss {
+		ints = append(ints, uint(Must(strconv.Atoi(string(s)))))
 	}
 	return ints
 }
