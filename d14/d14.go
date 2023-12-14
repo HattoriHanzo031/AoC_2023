@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 	"time"
 	"utils"
 )
@@ -12,23 +12,23 @@ func main() {
 	scanner, cleanup := utils.FileScaner("d14/input.txt")
 	defer cleanup()
 
-	var input [][]byte
+	var input []string
 	for scanner.Scan() {
 		if input == nil {
-			input = make([][]byte, len(scanner.Bytes()))
+			input = make([]string, len(scanner.Text()))
 		}
-		for i, b := range scanner.Bytes() {
-			input[i] = append(input[i], b)
+		for i, b := range scanner.Text() {
+			input[i] += string(b)
 		}
 	}
 
 	for i, line := range input {
-		out := [][]byte{}
-		for _, s := range bytes.Split(line, []byte{'#'}) {
-			count := bytes.Count(s, []byte{'.'})
-			out = append(out, append(bytes.ReplaceAll(s, []byte{'.'}, []byte{}), bytes.Repeat([]byte{'.'}, count)...))
+		out := []string{}
+		for _, s := range strings.Split(line, "#") {
+			count := strings.Count(s, ".")
+			out = append(out, strings.ReplaceAll(s, ".", "")+strings.Repeat(".", count))
 		}
-		input[i] = []byte(bytes.Join(out, []byte{'#'}))
+		input[i] = strings.Join(out, "#")
 	}
 
 	total := 0
