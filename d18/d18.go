@@ -8,10 +8,6 @@ import (
 
 type coord struct{ x, y int }
 
-func (c *coord) move(dir direction) coord {
-	return coord{c.x + dir.x, c.y + dir.y}
-}
-
 type direction coord
 
 var (
@@ -21,14 +17,14 @@ var (
 	right = direction{1, 0}
 )
 
-var dirMap = map[byte]direction{
+var dirMapP1 = map[byte]direction{
 	'U': up,
 	'D': down,
 	'L': left,
 	'R': right,
 }
 
-var dirMapP2 = map[byte]direction{
+var dirMapP2 = map[int]direction{
 	3: up,
 	1: down,
 	2: left,
@@ -36,9 +32,8 @@ var dirMapP2 = map[byte]direction{
 }
 
 type instruction struct {
-	dir   direction
-	num   uint32
-	color uint32
+	dir direction
+	num int
 }
 
 func main() {
@@ -46,72 +41,38 @@ func main() {
 	scanner, cleanup := utils.FileScaner("d18/input.txt")
 	defer cleanup()
 
-	var instructions []instruction
+	var instructionsP1 []instruction
 	var instructionsP2 []instruction
 	for scanner.Scan() {
-		var ins instruction
 		var dir byte
-		fmt.Sscanf(scanner.Text(), "%c %d (#%X)", &dir, &ins.num, &ins.color)
-		ins.dir = dirMap[dir]
-		instructions = append(instructions, ins)
-		instructionsP2 = append(instructionsP2, instruction{
-			dir: dirMapP2[byte(ins.color&0x0F)],
-			num: ins.color >> 4,
-		})
-		//fmt.Println(dirMapP2[byte(ins.color&0x0F)], ins.color>>4)
+		var color, num int
+		fmt.Sscanf(scanner.Text(), "%c %d (#%X)", &dir, &num, &color)
+		instructionsP1 = append(instructionsP1, instruction{dirMapP1[dir], num})
+		instructionsP2 = append(instructionsP2, instruction{dirMapP2[color&0x0F], color >> 4})
 	}
 
-	maxX, maxY := 0, 0
-	minX, minY := 0, 0
+	fmt.Println("P1:", dig(instructionsP1))
+	fmt.Println("P2:", dig(instructionsP2))
+}
+
+func dig(instructions []instruction) int {
+	points := []coord{{0, 0}}
+	circumference := 0
 	cur := coord{0, 0}
-	trench := map[coord]uint32{cur: 0xFFFFFF}
 	for _, ins := range instructions {
-		for i := uint32(0); i < ins.num; i++ {
-			cur.x += ins.dir.x
-			cur.y += ins.dir.y
-			maxX, maxY = max(maxX, cur.x), max(maxY, cur.y)
-			minX, minY = min(minX, cur.x), min(minY, cur.y)
-			trench[cur] = ins.color
-		}
+		cur.x += ins.dir.x * ins.num
+		cur.y += ins.dir.y * ins.num
+		points = append(points, coord{cur.x, cur.y})
+		circumference += ins.num
 	}
-
-	inside := map[coord]bool{}
-	fill(trench, inside, coord{1, 1})
-
-	fmt.Println("TRENCH:", len(trench))
-	fmt.Println("INSIDE:", len(inside))
-	fmt.Println("TOTAL:", len(inside)+len(trench))
-	//print(trench, inside, maxX, maxY, minX, minY)
+	return area(points) + circumference/2 + 1
 }
 
-func fill(trench map[coord]uint32, inside map[coord]bool, cur coord) {
-	if trench[cur] != 0 {
-		return
+func area(points []coord) int {
+	points = append(points, points[0])
+	a := 0
+	for i := 0; i < len(points)-1; i++ {
+		a += (points[i].x * points[i+1].y) - (points[i].y * points[i+1].x)
 	}
-	if inside[cur] {
-		return
-	}
-	inside[cur] = true
-
-	fill(trench, inside, cur.move(up))
-	fill(trench, inside, cur.move(down))
-	fill(trench, inside, cur.move(left))
-	fill(trench, inside, cur.move(right))
-}
-
-func print(trench map[coord]uint32, inside map[coord]bool, maxX, maxY, minX, minY int) {
-	for y := minY; y <= maxY; y++ {
-		for x := minX; x <= maxX; x++ {
-			if trench[coord{x, y}] == 0 {
-				if inside[coord{x, y}] {
-					fmt.Print(".")
-				} else {
-					fmt.Print(" ")
-				}
-			} else {
-				fmt.Print("#")
-			}
-		}
-		fmt.Println("")
-	}
+	return a / 2
 }
