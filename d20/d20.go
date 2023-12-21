@@ -7,39 +7,45 @@ import (
 	"utils"
 )
 
-type sender func(pulse bool, from string) (bool, string, []string)
+type sender func(pulse bool, from string) (bool, []string)
 
-func flipFlopFn(me string, outputs []string) sender {
+func flipFlopFn(outputs []string) sender {
 	var state bool
-	return func(pulse bool, from string) (bool, string, []string) {
+	return func(pulse bool, from string) (bool, []string) {
 		if !pulse {
 			state = !state
-			return state, me, outputs
+			return state, outputs
 		}
-		return state, me, nil
+		return state, nil
 	}
 }
 
-func conjunctionFn(me string, inputs, outputs []string) sender {
+func conjunctionFn(inputs, outputs []string) sender {
 	ins := make(map[string]bool, len(inputs))
 	for _, in := range inputs {
 		ins[in] = false
 	}
-	return func(pulse bool, from string) (bool, string, []string) {
+	return func(pulse bool, from string) (bool, []string) {
 		ins[from] = pulse
 		for _, v := range ins {
 			if !v {
-				return true, me, outputs
+				return true, outputs
 			}
 		}
-		return false, me, outputs
+		return false, outputs
 	}
 }
 
-func broadcasterFn(me string, outputs []string) sender {
-	return func(pulse bool, _ string) (bool, string, []string) {
-		return pulse, me, outputs
+func broadcasterFn(outputs []string) sender {
+	return func(pulse bool, _ string) (bool, []string) {
+		return pulse, outputs
 	}
+}
+
+type scannedModule struct {
+	t       byte
+	inputs  []string
+	outputs []string
 }
 
 func main() {
@@ -47,15 +53,9 @@ func main() {
 	scanner, cleanup := utils.FileScaner("d20/input.txt")
 	defer cleanup()
 
-	type module struct {
-		t       byte
-		inputs  []string
-		outputs []string
-	}
-
 	// %bm -> pm, vf
 	// &xn -> kc, jb, cb, tg, ks, tx
-	scanned := make(map[string]module)
+	scanned := make(map[string]scannedModule)
 	for scanner.Scan() {
 		name, outputs, _ := strings.Cut(scanner.Text(), " -> ")
 		t := name[0]
@@ -73,16 +73,17 @@ func main() {
 		scanned[name] = this
 	}
 
+	printGraph(scanned)
+
 	modules := make(map[string]sender, len(scanned))
 	for k, v := range scanned {
-		fmt.Println("KV", k, v)
 		switch v.t {
 		case 'b':
-			modules[k] = broadcasterFn(k, v.outputs)
+			modules[k] = broadcasterFn(v.outputs)
 		case '%':
-			modules[k] = flipFlopFn(k, v.outputs)
+			modules[k] = flipFlopFn(v.outputs)
 		case '&':
-			modules[k] = conjunctionFn(k, v.inputs, v.outputs)
+			modules[k] = conjunctionFn(v.inputs, v.outputs)
 		}
 	}
 
@@ -93,77 +94,67 @@ func main() {
 	}
 
 	counts := make(map[bool]int)
-	for i := 0; i < 1000; i++ {
+
+	rxInputs := make(map[string]bool)
+	for _, s := range scanned["hf"].inputs { // "hf" is the only input to "rx"
+		rxInputs[s] = true
+	}
+	loops := make(map[string]int)
+	for i := 0; len(loops) < len(rxInputs); i++ {
 		counts[false]++
-		countRx := 0
 		var initial out
-		initial.pulse, initial.from, initial.outputs = modules["broadcaster"](false, "")
-		//fmt.Println("INITIAL", initial)
-		//fmt.Println("PUSH")
+		initial.pulse, initial.outputs = modules["broadcaster"](false, "")
 		for outputs := []out{initial}; len(outputs) > 0; {
 			newOutputs := []out{}
-			//fmt.Println("OUTPUTS", outputs)
 			for _, oo := range outputs {
 				for _, o := range oo.outputs {
-					newOut := out{}
 					counts[oo.pulse]++
+					newOut := out{}
 					module, ok := modules[o]
 					if !ok {
-						if o == "rx" {
-							countRx++
-						}
 						continue
 					}
-					newOut.pulse, newOut.from, newOut.outputs = module(oo.pulse, oo.from)
+
+					newOut.pulse, newOut.outputs = module(oo.pulse, oo.from)
+					newOut.from = o
 					newOutputs = append(newOutputs, newOut)
+
+					if newOut.pulse {
+						if _, ok := loops[newOut.from]; rxInputs[newOut.from] && !ok {
+							loops[newOut.from] = i + 1
+						}
+					}
 				}
 			}
-			//fmt.Println("")
 			outputs = newOutputs
 		}
-		if countRx == 1 {
-			fmt.Println("I:", i)
-			return
+		if i+1 == 1000 {
+			fmt.Println("P1:", counts[true]*counts[false])
 		}
 	}
-	fmt.Println("COUNTS", counts)
+	lcmInput := []int{}
+	for _, l := range loops {
+		lcmInput = append(lcmInput, l)
+	}
+	fmt.Println("P2:", utils.LCM(lcmInput[0], lcmInput[1], lcmInput[2:]...))
 }
 
-// PUSH
-// button -low-> broadcaster
-// broadcaster -low-> a
-
-// a -high-> inv
-// a -high-> con
-
-// inv -low-> b
-// con -high-> output
-
-// b -high-> con
-// con -low-> output
-
-// PUSH
-// button -low-> broadcaster
-// broadcaster -low-> a
-// a -low-> inv
-// a -low-> con
-// inv -high-> b
-// con -high-> output
-
-// PUSH
-// button -low-> broadcaster
-// broadcaster -low-> a
-// a -high-> inv
-// a -high-> con
-// inv -low-> b
-// con -low-> output
-// b -low-> con
-// con -high-> output
-
-// PUSH
-// button -low-> broadcaster
-// broadcaster -low-> a
-// a -low-> inv
-// a -low-> con
-// inv -high-> b
-// con -high-> output
+func printGraph(scanned map[string]scannedModule) {
+	fmt.Print("digraph G {")
+	for k, v := range scanned {
+		fmt.Print(k, "-> {", strings.Join(v.outputs, ","), "};")
+		if k == "rx" {
+			fmt.Print(k, "[shape=Msquare];")
+			continue
+		}
+		switch v.t {
+		case 'b':
+			fmt.Print(k, "[shape=Mdiamond];")
+		case '%':
+			fmt.Print(k, "[shape=ellipse];")
+		case '&':
+			fmt.Print(k, "[shape=box];")
+		}
+	}
+	fmt.Println("}")
+}
