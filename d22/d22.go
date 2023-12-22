@@ -37,10 +37,6 @@ func main() {
 		bricks = append(bricks, b)
 	}
 
-	for _, b := range bricks {
-		fmt.Println(string('A'+b.num), "-", b.blocks[0], "~", b.blocks[len(b.blocks)-1], b.minZ, b.maxZ)
-	}
-
 	slices.SortFunc(bricks, func(a, b brick) int {
 		return a.minZ - b.minZ
 	})
@@ -66,27 +62,47 @@ func main() {
 		}
 		slices.Sort(supportedBy)
 		supportedBy = slices.Compact(supportedBy)
-		fmt.Print(string('A'+brick.num), " supported by ")
-		for _, sb := range supportedBy {
-			fmt.Print(string('A' + sb))
-		}
-		fmt.Println("")
+
 		if len(supportedBy) == 1 {
 			doNotDisintegrate[supportedBy[0]] = true
 		}
 	}
+	slices.SortFunc(bricks, func(a, b brick) int {
+		return a.minZ - b.minZ
+	})
 
-	fmt.Println("do not", doNotDisintegrate)
-	total := 0
-	for _, b := range bricks {
+	totalP1 := 0
+	totalP2 := 0
+	for i, b := range bricks {
 		if !doNotDisintegrate[b.num] {
-			total++
+			totalP1++
+		} else {
+			totalP2 += drop(slices.Delete(slices.Clone(bricks), i, i+1))
 		}
 	}
 
-	for _, b := range bricks {
-		fmt.Println(string('A'+b.num), "-", b.blocks[0], "~", b.blocks[len(b.blocks)-1], b.minZ, b.maxZ)
-	}
+	fmt.Println("P1:", totalP1)
+	fmt.Println("P2:", totalP2)
+}
 
-	fmt.Println("TOTAL:", total)
+func drop(bricks []brick) int {
+	dropped := 0
+	surfaces := map[coord]int{}
+	for i, brick := range bricks {
+		dropTo := 0
+		for _, bl := range brick.blocks {
+			dropTo = max(dropTo, surfaces[bl])
+		}
+
+		if dropTo != bricks[i].minZ {
+			bricks[i].maxZ = bricks[i].maxZ - (bricks[i].minZ - dropTo)
+			bricks[i].minZ = dropTo
+			dropped++
+		}
+
+		for _, bl := range brick.blocks {
+			surfaces[bl] = bricks[i].maxZ
+		}
+	}
+	return dropped
 }
