@@ -18,61 +18,67 @@ var (
 	right = direction{1, 0}
 )
 
-func print(lenX, lenY int, stones map[coord]bool, slopes map[coord]direction) {
+func print(lenX, lenY int, stones map[coord]bool, slopes map[coord]direction, nodes map[coord]node) {
 	c := coord{}
 	for c.y = 0; c.y < lenY; c.y++ {
 		for c.x = 0; c.x < lenX; c.x++ {
+			node, nodeOk := nodes[c]
 			switch _, ok := slopes[c]; true {
 			case stones[c]:
-				fmt.Print("#")
+				fmt.Print("░")
+			case nodeOk:
+				fmt.Print(len(node.connected))
 			case ok:
 				fmt.Print(">")
 			default:
-				fmt.Print(".")
+				fmt.Print(" ")
 			}
 		}
 		fmt.Println("")
 	}
 }
 
-func moverFn(maxX, maxY int, stones map[coord]bool, slopes map[coord]direction) func(cur coord) []coord {
-	visited := map[coord]bool{}
-	return func(cur coord) []coord {
-		if visited[cur] {
-			return []coord{}
-		}
-		visited[cur] = true
+type node struct {
+	connected map[coord]int
+}
 
-		if d, ok := slopes[cur]; ok {
-			return []coord{{cur.x + d.x, cur.y + d.y}}
+func findJunction(prev, cur coord, mover func(cur coord) []coord) (coord, int) {
+	count := 0
+	for {
+		count++
+		next := mover(cur)
+		if len(next) != 2 {
+			return cur, count
 		}
-		out := []coord{}
-		if cur.x != maxX {
-			c := coord{cur.x + right.x, cur.y + right.y}
-			if !stones[c] {
-				out = append(out, c)
-			}
+		if next[0].x == prev.x && next[0].y == prev.y {
+			prev = cur
+			cur = next[1]
+		} else {
+			prev = cur
+			cur = next[0]
 		}
-		if cur.x != 0 {
-			c := coord{cur.x + left.x, cur.y + left.y}
-			if !stones[c] {
-				out = append(out, c)
-			}
-		}
-		if cur.y != 0 {
-			c := coord{cur.x + up.x, cur.y + up.y}
-			if !stones[c] {
-				out = append(out, c)
-			}
-		}
-		if cur.y != maxY {
-			c := coord{cur.x + down.x, cur.y + down.y}
-			if !stones[c] {
-				out = append(out, c)
-			}
-		}
-		return out
 	}
+}
+
+func makeNodes(lenX, lenY int, stones map[coord]bool, slopes map[coord]direction) map[coord]node {
+	nodes := make(map[coord]node)
+	mover := moverLongestFn(lenX-1, lenY-1, stones, slopes)
+	c := coord{}
+	for c.y = 0; c.y < lenY; c.y++ {
+		for c.x = 0; c.x < lenX; c.x++ {
+			if stones[c] {
+				continue
+			}
+			if neighbors := mover(c); len(neighbors) != 2 {
+				nodes[c] = node{connected: make(map[coord]int, len(neighbors))}
+				for _, ngbh := range neighbors {
+					next, count := findJunction(c, ngbh, mover)
+					nodes[c].connected[next] = count
+				}
+			}
+		}
+	}
+	return nodes
 }
 
 func moverLongestFn(lenX, lenY int, stones map[coord]bool, slopes map[coord]direction) func(cur coord) []coord {
@@ -81,7 +87,7 @@ func moverLongestFn(lenX, lenY int, stones map[coord]bool, slopes map[coord]dire
 			return []coord{{cur.x + d.x, cur.y + d.y}}
 		}
 		out := []coord{}
-		if cur.x != lenX-1 {
+		if cur.x != lenX {
 			c := coord{cur.x + right.x, cur.y + right.y}
 			if !stones[c] {
 				out = append(out, c)
@@ -99,43 +105,12 @@ func moverLongestFn(lenX, lenY int, stones map[coord]bool, slopes map[coord]dire
 				out = append(out, c)
 			}
 		}
-		if cur.y != lenY-1 {
+		if cur.y != lenY {
 			c := coord{cur.x + down.x, cur.y + down.y}
 			if !stones[c] {
 				out = append(out, c)
 			}
 		}
-		return out
-	}
-}
-
-func moverLongest2Fn(stones map[coord]bool, slopes map[coord]direction) func(cur coord) []coord {
-	return func(cur coord) []coord {
-		if d, ok := slopes[cur]; ok {
-			return []coord{{cur.x + d.x, cur.y + d.y}}
-		}
-		out := []coord{}
-
-		c := coord{cur.x + right.x, cur.y + right.y}
-		if !stones[c] {
-			out = append(out, c)
-		}
-
-		c = coord{cur.x + left.x, cur.y + left.y}
-		if !stones[c] {
-			out = append(out, c)
-		}
-
-		c = coord{cur.x + up.x, cur.y + up.y}
-		if !stones[c] {
-			out = append(out, c)
-		}
-
-		c = coord{cur.x + down.x, cur.y + down.y}
-		if !stones[c] {
-			out = append(out, c)
-		}
-
 		return out
 	}
 }
@@ -176,55 +151,96 @@ func main() {
 
 	slopes[start] = down
 	slopes[exit] = up
+	nodes := makeNodes(lenX, lenY, stones, slopes)
+	print(lenX, lenY, stones, slopes, nodes)
+	findAllPaths(0, start, exit, nodes, make(map[coord]bool))
+	fmt.Println("LONGEST P1:", longestPath)
 
-	fmt.Println(lenX, lenY, start)
-	print(lenX, lenY, stones, slopes)
-
-	shortest(lenX, lenY, stones, slopes, start, exit)
-	longest(0, stones, slopes, start, exit, make(map[coord]bool), moverLongestFn(lenX, lenY, stones, slopes))
-	fmt.Println("LONGEST:", longestPath)
+	slopes = map[coord]direction{} // clear all slopes
+	slopes[start] = down
+	slopes[exit] = up
+	longestPath = 0
+	nodes = makeNodes(lenX, lenY, stones, slopes)
+	//print(lenX, lenY, stones, slopes, nodes)
+	findAllPaths(0, start, exit, nodes, make(map[coord]bool))
+	fmt.Println("LONGEST P2:", longestPath)
 }
 
 var longestPath int
 
-func longest(steps int, stones map[coord]bool, slopes map[coord]direction, cur, exit coord, visited map[coord]bool, mover func(cur coord) []coord) {
+func findAllPaths(count int, cur, exit coord, nodes map[coord]node, visited map[coord]bool) {
 	if cur.x == exit.x && cur.y == exit.y {
-		fmt.Println("EXIT", steps, len(visited))
-		// for k := range visited {
-		// 	fmt.Println(k)
-		// }
-		longestPath = max(longestPath, steps)
-		return
+		//fmt.Println("END", count)
+		longestPath = max(longestPath, count)
 	}
-
 	if visited[cur] {
 		return
 	}
 	visited[cur] = true
 
-	for _, next := range mover(cur) {
-		longest(steps+1, stones, slopes, next, exit, maps.Clone(visited), mover)
+	for node, distance := range nodes[cur].connected {
+		findAllPaths(count+distance, node, exit, nodes, maps.Clone(visited))
 	}
 }
 
-func shortest(lenX, lenY int, stones map[coord]bool, slopes map[coord]direction, start, exit coord) {
-	mover := moverFn(lenX, lenY, stones, slopes)
-	q := map[coord]struct{}{start: {}}
-	step := 0
-	for len(q) > 0 {
-		newQ := make(map[coord]struct{})
-		for c := range q {
-			for _, coord := range mover(c) {
-				newQ[coord] = struct{}{}
-			}
-			if c.x == exit.x && c.y == exit.y {
-				fmt.Println("EXIT:", step)
-				return
-			}
-		}
+// func moverFn(maxX, maxY int, stones map[coord]bool, slopes map[coord]direction) func(cur coord) []coord {
+// 	visited := map[coord]bool{}
+// 	return func(cur coord) []coord {
+// 		if visited[cur] {
+// 			return []coord{}
+// 		}
+// 		visited[cur] = true
 
-		q = newQ
-		step++
-	}
-	fmt.Println(step)
-}
+// 		if d, ok := slopes[cur]; ok {
+// 			return []coord{{cur.x + d.x, cur.y + d.y}}
+// 		}
+// 		out := []coord{}
+// 		if cur.x != maxX {
+// 			c := coord{cur.x + right.x, cur.y + right.y}
+// 			if !stones[c] {
+// 				out = append(out, c)
+// 			}
+// 		}
+// 		if cur.x != 0 {
+// 			c := coord{cur.x + left.x, cur.y + left.y}
+// 			if !stones[c] {
+// 				out = append(out, c)
+// 			}
+// 		}
+// 		if cur.y != 0 {
+// 			c := coord{cur.x + up.x, cur.y + up.y}
+// 			if !stones[c] {
+// 				out = append(out, c)
+// 			}
+// 		}
+// 		if cur.y != maxY {
+// 			c := coord{cur.x + down.x, cur.y + down.y}
+// 			if !stones[c] {
+// 				out = append(out, c)
+// 			}
+// 		}
+// 		return out
+// 	}
+// }
+
+// func shortest(lenX, lenY int, stones map[coord]bool, slopes map[coord]direction, start, exit coord) {
+// 	mover := moverFn(lenX, lenY, stones, slopes)
+// 	q := map[coord]struct{}{start: {}}
+// 	step := 0
+// 	for len(q) > 0 {
+// 		newQ := make(map[coord]struct{})
+// 		for c := range q {
+// 			for _, coord := range mover(c) {
+// 				newQ[coord] = struct{}{}
+// 			}
+// 			if c.x == exit.x && c.y == exit.y {
+// 				fmt.Println("EXIT:", step)
+// 				return
+// 			}
+// 		}
+
+// 		q = newQ
+// 		step++
+// 	}
+// 	fmt.Println(step)
+// }
